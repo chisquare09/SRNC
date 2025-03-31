@@ -1,0 +1,10 @@
+matplotlib
+scanpy
+cutadapt
+pixelator
+torch
+anndata
+pandas
+torchvision
+lightgbm
+scvi-tools
