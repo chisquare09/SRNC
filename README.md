@@ -21,8 +21,31 @@ We implemented SRNC model as SequentialRadiusNeighborsClassifier function. To tr
 ```
 from model.srnc import SequentialRadiusNeighborsClassifier
 
-Y_predict_srnc=SequentialRadiusNeighborsClassifier(data_embbed_x, y_all_labels, annotated_x, unannotated_x, annotated_y, predictive_alg,control_neighbor, shrink_parameter, filter_proportion, threshold_rejection)
+Y_predict_srnc=SequentialRadiusNeighborsClassifier(X_embedded, y_all_labels, X_train, X_test, Y_train, predictive_alg,control_neighbor, shrink_parameter, filter_proportion, threshold_rejection)
 
+```
+
+This function require the following input: 
+* X_embedded: a lower dimensional representation of the original dataset, which is the embedded feature space of dataset.
+* Y_all_labels: a list of all possible class labels in the datasets.
+* X_train: feature matrix for the training set.
+* X_test: feature matrix for the test set.
+* Y_train: ground truth labels for X_train.
+* predictive_alg: the classification algorithm used (in this case we used lightGBM).
+* control_neighbor: the number of neareast neighbors considered for certain calculations.
+* shrink_parameter: a parameter controlling the shrinking process in the classification.
+* filter_proportion: proportion of training samples used for certain selection steps.
+* threshold_rejection: a probability threshold for rejecting uncertain predictions.
+
+The output of this function is a list of predicted class labels ```Y_predict``` for each test sample in ```X_test```
+
+# Evaluation
+To evaluate the model, we can extract the predicted lable ```Y_predict_srnc``` from SRNC model to compare with the ```Y_test``` label from the test dataset using sevaral built-in function provided by ```sklearn.metrics```. For instance: 
+```
+from sklearn.metrics import adjusted_rand_score, accuracy
+
+adj_score = adjusted_rand_score(Y_predict_srnc,Y_test)
+accuracy_score = accuracy(Y_predict_srnc, Y_test)
 ```
 # Reproducibility
 

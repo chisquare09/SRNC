@@ -27,8 +27,8 @@ embedded_option = "PCA"
 shrink_parameter = 1
 proportion_unknown = 0.2
 control_neighbor = 5 
-threshold_rejection = 0.7 
-filter_proportion = 0 
+threshold_rejection = 0.5 
+filter_proportion = 10
 data_name = "bench"
 
 # Note: change the path to dataset
@@ -211,7 +211,7 @@ for i in np.unique(y_exp_10x):
 
     # Specify the CSV file path
     csv_file = str(data_name) + '_mars_results'+'_'+str(control_neighbor)+'_'+str(threshold_rejection)+'_'+str(filter_proportion)+predictive_alg+'.csv'
-    folder_path = '/content/drive/MyDrive/mars/results/no_integration/mars_result'
+    folder_path = '/content/drive/MyDrive/mars/results/integration/mars_result'
     os.makedirs(folder_path, exist_ok=True)
     csv_file = os.path.join(folder_path, csv_file)
 
@@ -268,12 +268,12 @@ rejection_results_df = pd.DataFrame({
 })
 
 # Save the results to a CSV file
-folder_path2 ='/content/drive/MyDrive/mars/results/no_integration/srnc_result'
+folder_path2 ='/content/drive/MyDrive/mars/results/integration/srnc_result'
 os.makedirs(folder_path2, exist_ok=True)
 result_file_name2 = str(data_name) + '_srnc_result'+'_'+str(control_neighbor)+'_'+str(threshold_rejection)+'_'+str(filter_proportion)+predictive_alg+'.csv'
 srnc_results_df.to_csv(os.path.join(folder_path2, result_file_name2), index=False)
 
-folder_path3 = '/content/drive/MyDrive/mars/results/no_integration/rejection_result'
+folder_path3 = '/content/drive/MyDrive/mars/results/integration/rejection_result'
 os.makedirs(folder_path3, exist_ok=True)
 result_file_name3 = str(data_name) + '_rejection_result'+'_'+str(control_neighbor)+'_'+str(threshold_rejection)+'_'+str(filter_proportion)+predictive_alg+'.csv'
 rejection_results_df.to_csv(os.path.join(folder_path3,result_file_name3),index=False)
@@ -318,7 +318,7 @@ for ax in axs:
     ax.set_xlabel('')
 fig.tight_layout()
 # save plot
-folder_path4 = '/content/drive/MyDrive/mars/results/no_integration/plot'
+folder_path4 = '/content/drive/MyDrive/mars/results/integration/plot'
 os.makedirs(folder_path4, exist_ok=True)
 plt.savefig(os.path.join(folder_path4, f'Performance Metrics on {data_name} dataset {control_neighbor}_{threshold_rejection}_{filter_proportion}_{predictive_alg}.png'))
 
