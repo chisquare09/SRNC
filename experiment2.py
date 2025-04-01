@@ -27,8 +27,8 @@ embedded_option = "PCA"
 shrink_parameter = 1
 proportion_unknown = 0.2
 control_neighbor = 5 
-threshold_rejection = 0.5 
-filter_proportion = 10
+threshold_rejection = 0.7
+filter_proportion = 0
 data_name = "bench"
 
 # Note: change the path to dataset
@@ -226,9 +226,13 @@ for i in np.unique(y_exp_10x):
 
 
     # %%
+    annotated_x = exp_10x.obsm['X_scVI']
+    unannotated_x = exp_celseq2.obsm['X_scVI']
+    annotated_y = np.array(exp_10x.obs['ground_truth'], dtype=np.int64)
+    unannotated_y = np.array(exp_celseq2.obs['ground_truth'], dtype=np.int64)
+
     data_embbed_x=np.concatenate([annotated_x,unannotated_x])
     data_embbed_y=np.concatenate([annotated_y,unannotated_y])
-
     y_all_labels = list(set(data_embbed_y))
   
 
