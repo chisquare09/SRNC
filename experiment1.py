@@ -8,7 +8,6 @@ os.environ['KMP_DUPLICATE_LIB_OK']='TRUE'
 
 import numpy as np
 import pandas as pd
-import scanpy as sc
 import seaborn as sns
 import matplotlib.pyplot as plt
 import anndata as ad
@@ -30,6 +29,7 @@ threshold_rejection = 0.3
 filter_proportion = 0 
 data_set = ['pollen', 'patel', 'muraro', 'xin', 'zeisel', 'baron']
 
+# loop through datasets
 for data_name in data_set:
     if data_name=='muraro':
         k_fold = 3
@@ -38,17 +38,17 @@ for data_name in data_set:
 
     if data_name=='pollen':
         # Note: change the path to benchmark dataset
-        data = pd.read_csv('/home/vannguyen/project/SRNC/data/benchmark/pollen-prepare-log_count_100pca.csv',delimiter=',',header=None, dtype='float32')
+        data = pd.read_csv('path/to/pollen-prepare-log_count_100pca.csv',delimiter=',',header=None, dtype='float32')
     elif data_name=='patel':
-        data = pd.read_csv('/home/vannguyen/project/SRNC/data/benchmark/patel-prepare-log_count_100pca.csv',delimiter=',',header=None, dtype='float32')
+        data = pd.read_csv('path/to/patel-prepare-log_count_100pca.csv',delimiter=',',header=None, dtype='float32')
     elif data_name=='muraro':
-        data = pd.read_csv('/home/vannguyen/project/SRNC/data/benchmark/muraro-prepare-log_count_100pca.csv',delimiter=',',header=None, dtype='float32')
+        data = pd.read_csv('path/to/muraro-prepare-log_count_100pca.csv',delimiter=',',header=None, dtype='float32')
     elif data_name=='xin':
-        data = pd.read_csv('/home/vannguyen/project/SRNC/data/benchmark/xin-prepare-log_count_100pca.csv',delimiter=',',header=None, dtype='float32')
+        data = pd.read_csv('path/to/xin-prepare-log_count_100pca.csv',delimiter=',',header=None, dtype='float32')
     elif data_name=='zeisel':
-        data = pd.read_csv('/home/vannguyen/project/SRNC/data/benchmark/zeisel-prepare-log_count_100pca.csv',delimiter=',',header=None, dtype='float32')
+        data = pd.read_csv('path/to/zeisel-prepare-log_count_100pca.csv',delimiter=',',header=None, dtype='float32')
     elif data_name=='baron':
-        data = pd.read_csv('/home/vannguyen/project/SRNC/data/benchmark/baron-prepare-log_count_100pca.csv',delimiter=',',header=None, dtype='float32')
+        data = pd.read_csv('path/to/baron-prepare-log_count_100pca.csv',delimiter=',',header=None, dtype='float32')
     else:
         print("No data!")
 
@@ -64,7 +64,7 @@ for data_name in data_set:
     precision_unknown_rejection_all = []
     F1_unknown_rejection_all = []
 
-    # for seed in range(5):
+    # Parameters for MARS
     params, unknown = get_parser().parse_known_args()
     params
     if torch.cuda.is_available() and not params.cuda:
@@ -72,8 +72,7 @@ for data_name in data_set:
     device = 'cuda:0' if torch.cuda.is_available() and params.cuda else 'cpu'
     params.device = device
 
-    # Sample data (difference number of classes)
-
+    # Data sampling: train and test set
     data = pd.DataFrame(data)
     annotated_data = pd.DataFrame()
     unannotated_data = pd.DataFrame()
@@ -86,7 +85,6 @@ for data_name in data_set:
 
         # remove randomly 1 labels
         annotated_data = annotated_data[annotated_data[0] != np.random.choice(annotated_data.iloc[:,0].unique())]
-        # Print results
         print("Annotated Data:")
         print(annotated_data.shape)
 
@@ -97,7 +95,6 @@ for data_name in data_set:
 
         print("Unique values in unannotated data: ", unannotated_data.iloc[:,0].nunique())
         print("Class name: ", unannotated_data.iloc[:,0].unique())
-        # # Create AnnData object and add value from dataframe
 
         annotated = ad.AnnData(X=annotated_data.iloc[:,1:].values)
         annotated.obs['ground_truth'] = annotated_data.iloc[:,0].values
@@ -108,13 +105,13 @@ for data_name in data_set:
 
         unannotated.obs['experiment'] = data_name
      
-        # Set name for obs and var
         annotated.obs_names = annotated_data.index.to_list()
         annotated.obs_names = [str(name) for name in annotated.obs_names]
         annotated.var_names = annotated_data.columns[1:]
         unannotated.obs_names = unannotated_data.index.to_list()
         unannotated.obs_names = [str(name) for name in unannotated.obs_names]
         unannotated.var_names = unannotated_data.columns[1:]
+
         # Train and Evaluate MARS
 
         annotated_y = np.array(annotated.obs['ground_truth'], dtype=np.int64)
@@ -128,13 +125,12 @@ for data_name in data_set:
 
         n_clusters = len(np.unique(unannotated_data[0]))
         print(n_clusters)
-        # # Run MARS
         mars = MARS(n_clusters, params, [annotated_set], unannotated_set, pretrain_data, hid_dim_1=1000, hid_dim_2=100)
         adata, landmarks, scores = mars.train(evaluation_mode=True, save_all_embeddings=False)
         print(adata)
 
         scores
-        # Convert the dictionary to a DataFrame
+        # Result dataframe
         df = pd.DataFrame()
         df_score = pd.DataFrame([scores])
         df_score = df_score.drop(columns=['adj_mi', 'nmi'])
@@ -142,23 +138,21 @@ for data_name in data_set:
 
 
 
-        # Specify the CSV file path
+        # Save the results to a CSV file
         csv_file = str(data_name) + '_mars_results'+'_'+str(control_neighbor)+'_'+str(threshold_rejection)+'_'+str(filter_proportion)+predictive_alg+'.csv'
         
         # Note: change the path to save result
-        root_path1 = '/content/drive/MyDrive/mars/results/mars_result'
+        root_path1 = 'path/to/results/mars_result'
         os.makedirs(os.path.join(root_path1, data_name), exist_ok=True)
         csv_file = os.path.join(root_path1,data_name, csv_file)
 
         if os.path.isfile(csv_file):
-            # If the file exists, append the new data without the header
             df = pd.concat([df,df_score],ignore_index = True)
             df.to_csv(csv_file, mode='a', header=False, index=False)
         else:
-            # If the file doesn't exist, write the new data with the header
             df_score.to_csv(csv_file, mode='w', header=True, index=False)
 
-
+        # SRNC and Rejection implementation
         data_embbed_x=np.concatenate([annotated_x,unannotated_x])
         data_embbed_y=np.concatenate([annotated_y,unannotated_y])
         y_all_labels = list(set(data_embbed_y))
@@ -179,7 +173,7 @@ for data_name in data_set:
         precision_unknown_rejection_all.append(precision_score(Y_predict_rejection,unannotated_y,average='weighted'))
         F1_unknown_rejection_all.append(f1_score(Y_predict_rejection,unannotated_y,average='weighted'))
 
-    # Create a DataFrame for storing results
+    # Result dataframes
     srnc_results_df = pd.DataFrame({
         "adj_rand": ARI_overall_srnc_all,
         "accuracy": accuracy_srnc_all,
@@ -196,11 +190,10 @@ for data_name in data_set:
         "f1_score": F1_unknown_rejection_all,
     })
 
-    # Save the results to a CSV file
     result_file_name2 = str(data_name) + '_srnc_result'+'_'+str(control_neighbor)+'_'+str(threshold_rejection)+'_'+str(filter_proportion)+predictive_alg+'.csv'
     
     # Note: change the path to save result
-    root_path2='/content/drive/MyDrive/mars/results/srnc_result'
+    root_path2='path/to/results/srnc_result'
     os.makedirs(os.path.join(root_path2, data_name), exist_ok=True)
 
 
@@ -209,11 +202,11 @@ for data_name in data_set:
     result_file_name3 = str(data_name) + '_rejection_result'+'_'+str(control_neighbor)+'_'+str(threshold_rejection)+'_'+str(filter_proportion)+predictive_alg+'.csv'
 
     # Note: change the path to save result
-    root_path3='/content/drive/MyDrive/mars/results/rejection_result'
+    root_path3='path/to/results/rejection_result'
     os.makedirs(os.path.join(root_path3, data_name), exist_ok=True)
     rejection_results_df.to_csv(os.path.join(root_path3,data_name,result_file_name3),index=False)
 
-    # plot barchart and boxplot to compare 3 methods
+    # Plot the results
     mars_average_df = mars_results_df.mean(axis=0).to_dict()
     srnc_average_df = srnc_results_df.mean(axis=0).to_dict()
     rejection_average_df = rejection_results_df.mean(axis=0).to_dict()
@@ -253,6 +246,6 @@ for data_name in data_set:
     fig.tight_layout()
     fig_name = f'Performance Metrics on {data_name} dataset {control_neighbor}_{threshold_rejection}_{filter_proportion}_{predictive_alg}.png'
     # Note: change the path to save result
-    root_path4='/content/drive/MyDrive/mars/results/plot'
+    root_path4='path/to/results/plot'
     os.makedirs(os.path.join(root_path4, data_name), exist_ok=True)
     plt.savefig(os.path.join(root_path4, data_name,fig_name))
