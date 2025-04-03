@@ -8,13 +8,9 @@ os.environ['KMP_DUPLICATE_LIB_OK']='TRUE'
 
 import numpy as np
 import pandas as pd
-import scanpy as sc
 import seaborn as sns
 import matplotlib.pyplot as plt
-import anndata as ad
 import torch
-
-from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.metrics import accuracy_score,adjusted_rand_score,f1_score,precision_score,recall_score
 from mars.mars import MARS
 from mars.experiment_dataset import ExperimentDataset
@@ -32,18 +28,18 @@ filter_proportion = 0
 data_name = "PMBCs"
 
 # Note: change the path to dataset
-exp_10x = pd.read_csv('/content/drive/MyDrive/mars/scPred/reference.csv', delimiter=',', header=None)
-exp_celseq2 = pd.read_csv('/content/drive/MyDrive/mars/scPred/query.csv', delimiter=',', header=None)
+reference = pd.read_csv('path/to/PBMCs/reference.csv', delimiter=',', header=None)
+query = pd.read_csv('path/to/PBMCs/query.csv', delimiter=',', header=None)
 
-X_exp_10x = exp_10x.iloc[:,1:].to_numpy(dtype=float)
-y_exp_10x = exp_10x.iloc[:, 0].to_numpy(dtype=int)
-X_celseq2 = exp_celseq2.iloc[:,1:].to_numpy(dtype=float)
-y_celseq2 = exp_celseq2.iloc[:, 0].to_numpy(dtype=int)
+X_reference = reference.iloc[:,1:].to_numpy(dtype=float)
+y_reference = reference.iloc[:, 0].to_numpy(dtype=int)
+X_query = query.iloc[:,1:].to_numpy(dtype=float)
+y_query = query.iloc[:, 0].to_numpy(dtype=int)
 
-# PCA into 100 dimensions
+# Data preprocessing: PCA
 pca = PCA(n_components=100)
-X_exp_10x = pca.fit_transform(X_exp_10x)
-X_celseq2 = pca.transform(X_celseq2)
+X_reference = pca.fit_transform(X_reference)
+X_query = pca.transform(X_query)
 
 ARI_overall_srnc_all = []
 accuracy_srnc_all = []
@@ -64,66 +60,55 @@ if torch.cuda.is_available() and not params.cuda:
 device = 'cuda' if torch.cuda.is_available() and params.cuda else 'cpu'
 params.device = device
 
-
-for i in np.unique(y_exp_10x):
+# Loop to remove label randomly
+for i in np.unique(y_reference):
     remove_label = i
-    X_10x = X_exp_10x[y_exp_10x != remove_label]
-    y_10x = y_exp_10x[y_exp_10x != remove_label].astype(dtype=int)
+    X_query = X_reference[y_reference != remove_label]
+    y_query = y_reference[y_reference != remove_label].astype(dtype=int)
 
-    num_cells_10x, num_genes_10x = X_10x.shape
-    num_cells_celseq2, num_genes_celseq2 = X_celseq2.shape
+    num_cells_query, num_genes_query = X_query.shape
+    num_cells_query, num_genes_query = X_query.shape
 
     print("Data experiment...")
     print(f"Class removed from training:{i}")
 
-    annotated_data = ExperimentDataset(X_10x, np.array([f"Cell {i}" for i in range(num_cells_10x)]), np.array([f"Var {j}" for j in range(num_genes_10x)]), '10x', y_10x)
-    unannotated_data = ExperimentDataset(X_celseq2, np.array([f"Cell {i}" for i in range(num_cells_celseq2)]), np.array([f"Var {j}" for j in range(num_genes_celseq2)]), 'celseq2', y_celseq2)
-    pretrain_data = ExperimentDataset(X_celseq2, np.array([f"Cell {i}" for i in range(num_cells_celseq2)]), np.array([f"Var {j}" for j in range(num_genes_celseq2)]), 'celseq2')
+    annotated_data = ExperimentDataset(X_query, np.array([f"Cell {i}" for i in range(num_cells_query)]), np.array([f"Var {j}" for j in range(num_genes_query)]), 'query', y_query)
+    unannotated_data = ExperimentDataset(X_query, np.array([f"Cell {i}" for i in range(num_cells_query)]), np.array([f"Var {j}" for j in range(num_genes_query)]), 'query', y_query)
+    pretrain_data = ExperimentDataset(X_query, np.array([f"Cell {i}" for i in range(num_cells_query)]), np.array([f"Var {j}" for j in range(num_genes_query)]), 'query')
     n_clusters = len(np.unique(unannotated_data.y))
 
-    # %% [markdown]
-    # # Run MARS
+    # MARS implementation
 
     mars = MARS(n_clusters, params, [annotated_data], unannotated_data, pretrain_data, hid_dim_1=1000, hid_dim_2=100)
-
-    # %%
     adata, landmarks, scores = mars.train(evaluation_mode=True, save_all_embeddings=False)
     print(adata)
-
-    # %%
     scores
 
-    # %%
-    # Convert the dictionary to a DataFrame
+    # Result dataframe
     df = pd.DataFrame()
     df_score = pd.DataFrame([scores])
     df_score = df_score.drop(columns=['adj_mi', 'nmi'])
     mars_results_df = df_score
 
-
-
-    # Specify the CSV file path
-    csv_file = str(data_name) + '_mars_results'+'_'+str(control_neighbor)+'_'+str(threshold_rejection)+'_'+str(filter_proportion)+predictive_alg+'scPred'+'.csv'
+    csv_file = str(data_name) + '_mars_results'+'_'+str(control_neighbor)+'_'+str(threshold_rejection)+'_'+str(filter_proportion)+predictive_alg+'PBMCs'+'.csv'
     # Note: change the path to save result
-    folder_path = '/content/drive/MyDrive/mars/results/scPred/mars_result'
+    folder_path = 'path/to/results/PBMCs/mars_result'
     os.makedirs(folder_path, exist_ok=True)
     csv_file = os.path.join(folder_path, csv_file)
 
     if os.path.isfile(csv_file):
-        # If the file exists, append the new data without the header
         df = pd.concat([df,df_score],ignore_index = True)
         df.to_csv(csv_file, mode='a', header=False, index=False)
     else:
-        # If the file doesn't exist, write the new data with the header
         df_score.to_csv(csv_file, mode='w', header=True, index=False)
 
 
 
-    # %%
-    annotated_x = X_10x
-    annotated_y = y_10x
-    unannotated_x = X_celseq2
-    unannotated_y = y_celseq2
+    # SRNC and Rejection implementation
+    annotated_x = X_query
+    annotated_y = y_query
+    unannotated_x = X_query
+    unannotated_y = y_query
     data_embbed_x=np.concatenate([annotated_x,unannotated_x])
     data_embbed_y=np.concatenate([annotated_y,unannotated_y])
 
@@ -147,7 +132,7 @@ for i in np.unique(y_exp_10x):
     precision_unknown_rejection_all.append(precision_score(Y_predict_rejection,unannotated_y,average='weighted'))
     F1_unknown_rejection_all.append(f1_score(Y_predict_rejection,unannotated_y,average='weighted'))
 
-# Create a DataFrame for storing results
+# Result dataframes
 srnc_results_df = pd.DataFrame({
     "adj_rand": ARI_overall_srnc_all,
     "accuracy": accuracy_srnc_all,
@@ -167,18 +152,18 @@ rejection_results_df = pd.DataFrame({
 # Save the results to a CSV file
 
 # Note: change the path to save result
-folder_path2 ='/content/drive/MyDrive/mars/results/scPred/srnc_result'
+folder_path2 ='path/to/results/PBMCs/srnc_result'
 os.makedirs(folder_path2, exist_ok=True)
-result_file_name2 = str(data_name) + '_srnc_result'+'_'+str(control_neighbor)+'_'+str(threshold_rejection)+'_'+str(filter_proportion)+predictive_alg+'scPred'+'.csv'
+result_file_name2 = str(data_name) + '_srnc_result'+'_'+str(control_neighbor)+'_'+str(threshold_rejection)+'_'+str(filter_proportion)+predictive_alg+'PBMCs'+'.csv'
 srnc_results_df.to_csv(os.path.join(folder_path2, result_file_name2), index=False)
 
 # Note: change the path to save result
-folder_path3 = '/content/drive/MyDrive/mars/results/scPred/rejection_result'
+folder_path3 = 'path/to/results/PBMCs/rejection_result'
 os.makedirs(folder_path3, exist_ok=True)
-result_file_name3 = str(data_name) + '_rejection_result'+'_'+str(control_neighbor)+'_'+str(threshold_rejection)+'_'+str(filter_proportion)+predictive_alg+'scPred'+'.csv'
+result_file_name3 = str(data_name) + '_rejection_result'+'_'+str(control_neighbor)+'_'+str(threshold_rejection)+'_'+str(filter_proportion)+predictive_alg+'PBMCs'+'.csv'
 rejection_results_df.to_csv(os.path.join(folder_path3,result_file_name3),index=False)
 
-# plot barchart and boxplot to compare 3 methods
+# Plot the results
 mars_average_df = mars_results_df.mean(axis=0).to_dict()
 srnc_average_df = srnc_results_df.mean(axis=0).to_dict()
 rejection_average_df = rejection_results_df.mean(axis=0).to_dict()
@@ -219,8 +204,8 @@ fig.tight_layout()
 # save plot
 
 # Note: change the path to save result
-folder_path4 = '/content/drive/MyDrive/mars/results/scPred/plot'
+folder_path4 = 'path/to/results/PBMCs/plot'
 os.makedirs(folder_path4, exist_ok=True)
-plt.savefig(os.path.join(folder_path4, f'Performance Metrics on {data_name} dataset {control_neighbor}_{threshold_rejection}_{filter_proportion}_{predictive_alg}_scPred.png'))
+plt.savefig(os.path.join(folder_path4, f'Performance Metrics on {data_name} dataset {control_neighbor}_{threshold_rejection}_{filter_proportion}_{predictive_alg}_PBMCs.png'))
 
 
