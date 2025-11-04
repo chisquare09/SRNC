@@ -1,3 +1,5 @@
 data/PMBCs/query.csv filter=lfs diff=lfs merge=lfs -text
 data/PMBCs/reference.csv filter=lfs diff=lfs merge=lfs -text
 data/bench/cellbench.h5ad filter=lfs diff=lfs merge=lfs -text
+*.h5ad filter=lfs diff=lfs merge=lfs -text
+data/PMBCs/*.csv filter=lfs diff=lfs merge=lfs -text
