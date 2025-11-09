@@ -13,11 +13,11 @@ import scanpy as sc
 from collections import OrderedDict
 from collections import defaultdict
 
-from mars.loss import loss_task, loss_test, reconstruction_loss
-from mars.net import FullNet
-from mars.landmarks import compute_landmarks_tr, init_landmarks
-from mars.utils.utils import init_data_loaders, euclidean_dist
-from mars.metrics import compute_scores
+from .loss import loss_task, loss_test, reconstruction_loss
+from .net import FullNet
+from .landmarks import compute_landmarks_tr, init_landmarks
+from .utils.utils import init_data_loaders, euclidean_dist
+from .metrics import compute_scores
 
 class MARS:
     
@@ -84,18 +84,17 @@ class MARS:
         optim: optimizer
         """
         print('Pretraining..')
-        for _ in range(self.epochs_pretrain):
+
+        for i in range(self.epochs_pretrain):
             for _, batch in enumerate(self.pretrain_loader):
                 x,_,_ = batch
                 x = x.to(self.device)
                 _, decoded = self.model(x)
-               
                 loss = reconstruction_loss(decoded, x)
                 # assert loss.requires_grad, "Loss tensor does not require gradients"
                 optim.zero_grad()              
                 loss.backward()                    
                 optim.step() 
-    
     def train(self, evaluation_mode=True, save_all_embeddings=True):
         """Train model.
         evaluation_mode: if True, validates model on the unlabeled dataset. In the evaluation mode, ground truth labels
@@ -109,10 +108,9 @@ class MARS:
                 metrics: clustering metrics if evaluation_mode is True
                 
         """
-    
         tr_iter = [iter(dl) for dl in self.train_loader]
-        print(tr_iter)
-        
+#        tr_iter = [iter(self.train_loader)]
+
         if self.val_loader is not None:
             val_iter = [iter(dl) for dl in self.val_loader]
     
@@ -121,18 +119,20 @@ class MARS:
         #     assert param.requires_grad, f"Parameter {param} does not require gradients"
         if self.pretrain_flag:
             self.pretrain(optim_pretrain)
+            print("Pretraining done")
         else:
-            self.model.load_state_dict(torch.load(self.MODEL_FILE))    
+            self.model.load_state_dict(torch.load(self.MODEL_FILE))
+
         test_iter = iter(self.test_loader)
         landmk_tr, landmk_test = init_landmarks(self.n_clusters, self.train_loader, self.test_loader, self.model, self.device)
         optim, optim_landmk_test = self.init_optim(list(self.model.encoder.parameters()), landmk_test, self.lr)
         lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer=optim,
                                                gamma=self.lr_gamma,
-                                               step_size=self.step_size)
-        
+                                               step_size=self.step_size)            
         best_acc = 0
         for epoch in range(1, self.epochs+1):
             self.model.train()
+            
             loss_tr, acc_tr, landmk_tr, landmk_test = self.do_epoch(tr_iter, test_iter,
                                               optim, optim_landmk_test,
                                               landmk_tr, landmk_test)
@@ -164,7 +164,7 @@ class MARS:
         adata = self.save_result(tr_iter, adata_test, save_all_embeddings)
         
         if evaluation_mode:
-            return adata, landmk_all, eval_results
+            return adata, landmk_all, eval_results 
         
         return adata, landmk_all
     
@@ -265,7 +265,6 @@ class MARS:
         # update centroids    
         task_idx = torch.randperm(len(tr_iter)) 
         for task in task_idx:
-            
             task = int(task)
             x, y, _ = next(tr_iter[task])
             x, y = x.to(self.device), y.to(self.device)

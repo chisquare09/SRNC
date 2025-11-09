@@ -51,6 +51,10 @@ accuracy_score = accuracy(Y_predict_srnc, Y_test)
 
 The Python scripts to reproduce the results in our paper for each section are included in this directory (experiment1, ecperiment2, experiment3). For each experiment, please run the corresponding .py file.
 
+# Hardware
+
+This code was experiment on Apple M4 Pro SoC (14-core CPU, 20-core GPU, 16-core Neural Engine) - 24GB
+
 
 
 

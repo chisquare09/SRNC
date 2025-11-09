@@ -2,7 +2,7 @@
 import torch
 from torch.nn import functional as F
 
-from mars.utils.utils import euclidean_dist
+from .utils.utils import euclidean_dist
 
 
 def loss_task(encoded, prototypes, target, criterion='dist'):

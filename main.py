@@ -16,9 +16,9 @@ import torch
 
 from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.metrics import accuracy_score,adjusted_rand_score,f1_score,precision_score,recall_score
-from mars.mars import MARS
-from mars.experiment_dataset import ExperimentDataset
-from args_parser import get_parser
+from model.mars.mars import MARS
+from model.mars.experiment_dataset import ExperimentDataset
+from model.args_parser import get_parser
 
 
 mars_score = []
@@ -43,8 +43,8 @@ filter_proportion = 0
 
 # data_name = 'scPred'
 
-adata_raw = sc.read_h5ad('/content/drive/MyDrive/mars/cellbench.h5ad')
-adata_raw
+adata_raw = sc.read_h5ad('./data/bench/cellbench.h5ad')
+print(adata_raw)
 adata = adata_raw.copy()
 
 sc.pp.normalize_per_cell(adata, counts_per_cell_after=1e4)
@@ -135,7 +135,7 @@ for data_name in data_set:
 
         # Specify the CSV file path
         csv_file = str(data_name) + '_mars_results'+'_'+str(control_neighbor)+'_'+str(threshold_rejection)+'_'+str(filter_proportion)+predictive_alg+'.csv'
-        folder_path = '/content/drive/MyDrive/mars/results/mars_result'
+        folder_path = './results/mars_result'
         os.makedirs(folder_path, exist_ok=True)
         csv_file = os.path.join(folder_path, csv_file)
 
@@ -197,12 +197,12 @@ for data_name in data_set:
     })
 
     # Save the results to a CSV file
-    folder_path2 ='/content/drive/MyDrive/mars/results/srnc_result'
+    folder_path2 ='./results/srnc_result'
     os.makedirs(folder_path2, exist_ok=True)
     result_file_name2 = str(data_name) + '_srnc_result'+'_'+str(control_neighbor)+'_'+str(threshold_rejection)+'_'+str(filter_proportion)+predictive_alg+'.csv'
     srnc_results_df.to_csv(os.path.join(folder_path2, result_file_name2), index=False)
 
-    folder_path3 = '/content/drive/MyDrive/mars/results/rejection_result'
+    folder_path3 = './results/rejection_result'
     os.makedirs(folder_path3, exist_ok=True)
     result_file_name3 = str(data_name) + '_rejection_result'+'_'+str(control_neighbor)+'_'+str(threshold_rejection)+'_'+str(filter_proportion)+predictive_alg+'.csv'
     rejection_results_df.to_csv(os.path.join(folder_path3,result_file_name3),index=False)
@@ -248,6 +248,6 @@ for data_name in data_set:
         ax.set_xlabel('')
     fig.tight_layout()
     # save plot
-    folder_path4 = '/content/drive/MyDrive/mars/results/plot'
+    folder_path4 = './results/plot'
     os.makedirs(folder_path4, exist_ok=True)
     plt.savefig(os.path.join(folder_path4, f'Performance Metrics on {data_name} dataset {control_neighbor}_{threshold_rejection}_{filter_proportion}_{predictive_alg}.png'))

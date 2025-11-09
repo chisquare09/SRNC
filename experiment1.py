@@ -1,3 +1,4 @@
+import time
 from model.srnc import SequentialRadiusNeighborsClassifier
 from model.rejection import classification_rejection_v2
 
@@ -15,9 +16,12 @@ import torch
 
 from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.metrics import accuracy_score,adjusted_rand_score,f1_score,precision_score,recall_score
-from mars.mars import MARS
-from mars.experiment_dataset import ExperimentDataset
-from args_parser import get_parser
+import model.mars.mars as mars
+from model.mars.mars import MARS
+from model.mars.experiment_dataset import ExperimentDataset
+# from model.mars.experiment_dataset import ExperimentDataset
+from model.args_parser import get_parser
+
 
 # Setting parameters
 predictive_alg = "lightGBM"
@@ -25,10 +29,10 @@ embedded_option = "PCA"
 shrink_parameter = 1
 proportion_unknown = 0.2
 control_neighbor = 5 
-threshold_rejection = 0.3 
+threshold_rejection = 0.7
 filter_proportion = 0 
 data_set = ['pollen', 'patel', 'muraro', 'xin', 'zeisel', 'baron']
-
+timings_list = []
 # loop through datasets
 for data_name in data_set:
     if data_name=='muraro':
@@ -38,17 +42,17 @@ for data_name in data_set:
 
     if data_name=='pollen':
         # Note: change the path to benchmark dataset
-        data = pd.read_csv('path/to/pollen-prepare-log_count_100pca.csv',delimiter=',',header=None, dtype='float32')
+        data = pd.read_csv('./data/benchmark/pollen-prepare-log_count_100pca.csv',delimiter=',',header=None, dtype='float32')
     elif data_name=='patel':
-        data = pd.read_csv('path/to/patel-prepare-log_count_100pca.csv',delimiter=',',header=None, dtype='float32')
+        data = pd.read_csv('./data/benchmark/patel-prepare-log_count_100pca.csv',delimiter=',',header=None, dtype='float32')
     elif data_name=='muraro':
-        data = pd.read_csv('path/to/muraro-prepare-log_count_100pca.csv',delimiter=',',header=None, dtype='float32')
+        data = pd.read_csv('./data/benchmark/muraro-prepare-log_count_100pca.csv',delimiter=',',header=None, dtype='float32')
     elif data_name=='xin':
-        data = pd.read_csv('path/to/xin-prepare-log_count_100pca.csv',delimiter=',',header=None, dtype='float32')
+        data = pd.read_csv('./data/benchmark/xin-prepare-log_count_100pca.csv',delimiter=',',header=None, dtype='float32')
     elif data_name=='zeisel':
-        data = pd.read_csv('path/to/zeisel-prepare-log_count_100pca.csv',delimiter=',',header=None, dtype='float32')
+        data = pd.read_csv('./data/benchmark/zeisel-prepare-log_count_100pca.csv',delimiter=',',header=None, dtype='float32')
     elif data_name=='baron':
-        data = pd.read_csv('path/to/baron-prepare-log_count_100pca.csv',delimiter=',',header=None, dtype='float32')
+        data = pd.read_csv('./data/benchmark/baron-prepare-log_count_100pca.csv',delimiter=',',header=None, dtype='float32')
     else:
         print("No data!")
 
@@ -66,10 +70,12 @@ for data_name in data_set:
 
     # Parameters for MARS
     params, unknown = get_parser().parse_known_args()
-    params
+    print(params)
     if torch.cuda.is_available() and not params.cuda:
             print("WARNING: You have a CUDA device, so you should probably run with --cuda")
     device = 'cuda:0' if torch.cuda.is_available() and params.cuda else 'cpu'
+    device = 'mps' if torch.backends.mps.is_available() else device
+    print("Using device:", device)
     params.device = device
 
     # Data sampling: train and test set
@@ -84,7 +90,8 @@ for data_name in data_set:
         unannotated_data = data.iloc[test_index]
 
         # remove randomly 1 labels
-        annotated_data = annotated_data[annotated_data[0] != np.random.choice(annotated_data.iloc[:,0].unique())]
+        remove_label = np.random.choice(annotated_data.iloc[:,0].unique())
+        annotated_data = annotated_data[annotated_data[0] != remove_label]
         print("Annotated Data:")
         print(annotated_data.shape)
 
@@ -125,11 +132,15 @@ for data_name in data_set:
 
         n_clusters = len(np.unique(unannotated_data[0]))
         print(n_clusters)
+        start_time_mars = time.time()
         mars = MARS(n_clusters, params, [annotated_set], unannotated_set, pretrain_data, hid_dim_1=1000, hid_dim_2=100)
         adata, landmarks, scores = mars.train(evaluation_mode=True, save_all_embeddings=False)
+        print("Done training")
+        end_time_mars = time.time()
+        mars_time = end_time_mars - start_time_mars
         print(adata)
 
-        scores
+        print(scores)
         # Result dataframe
         df = pd.DataFrame()
         df_score = pd.DataFrame([scores])
@@ -142,7 +153,7 @@ for data_name in data_set:
         csv_file = str(data_name) + '_mars_results'+'_'+str(control_neighbor)+'_'+str(threshold_rejection)+'_'+str(filter_proportion)+predictive_alg+'.csv'
         
         # Note: change the path to save result
-        root_path1 = 'path/to/results/mars_result'
+        root_path1 = './results/experiment1/mars_result'
         os.makedirs(os.path.join(root_path1, data_name), exist_ok=True)
         csv_file = os.path.join(root_path1,data_name, csv_file)
 
@@ -157,10 +168,16 @@ for data_name in data_set:
         data_embbed_y=np.concatenate([annotated_y,unannotated_y])
         y_all_labels = list(set(data_embbed_y))
 
+        start_time_srnc = time.time()
         Y_predict_srnc=SequentialRadiusNeighborsClassifier(data_embbed_x, y_all_labels, annotated_x, unannotated_x, annotated_y, predictive_alg,
                                                 control_neighbor, shrink_parameter, filter_proportion, threshold_rejection)
-        Y_predict_rejection=classification_rejection_v2(data_embbed_x,data_embbed_y,y_all_labels,annotated_x,annotated_y,unannotated_x,predictive_alg,threshold_rejection)
+        end_time_srnc = time.time()
+        srnc_time = end_time_srnc - start_time_srnc
 
+        start_time_rejection = time.time()
+        Y_predict_rejection=classification_rejection_v2(data_embbed_x,data_embbed_y,y_all_labels,annotated_x,annotated_y,unannotated_x,predictive_alg,threshold_rejection)
+        end_time_rejection = time.time()
+        rejection_time = end_time_rejection - start_time_rejection
 
         ARI_overall_srnc_all.append(adjusted_rand_score(Y_predict_srnc,unannotated_y))
         accuracy_srnc_all.append(accuracy_score(Y_predict_srnc,unannotated_y))
@@ -172,6 +189,15 @@ for data_name in data_set:
         recall_unknown_rejection_all.append(recall_score(Y_predict_rejection,unannotated_y,average='weighted'))
         precision_unknown_rejection_all.append(precision_score(Y_predict_rejection,unannotated_y,average='weighted'))
         F1_unknown_rejection_all.append(f1_score(Y_predict_rejection,unannotated_y,average='weighted'))
+
+        timings_list.append({
+        "data_name": data_name,
+        "removed_label_sampled": remove_label,
+        "mars_time": mars_time,
+        "srnc_time": srnc_time,
+        "rejection_time": rejection_time,
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+    })
 
     # Result dataframes
     srnc_results_df = pd.DataFrame({
@@ -193,7 +219,7 @@ for data_name in data_set:
     result_file_name2 = str(data_name) + '_srnc_result'+'_'+str(control_neighbor)+'_'+str(threshold_rejection)+'_'+str(filter_proportion)+predictive_alg+'.csv'
     
     # Note: change the path to save result
-    root_path2='path/to/results/srnc_result'
+    root_path2='./results/experiment1/srnc_result'
     os.makedirs(os.path.join(root_path2, data_name), exist_ok=True)
 
 
@@ -202,7 +228,7 @@ for data_name in data_set:
     result_file_name3 = str(data_name) + '_rejection_result'+'_'+str(control_neighbor)+'_'+str(threshold_rejection)+'_'+str(filter_proportion)+predictive_alg+'.csv'
 
     # Note: change the path to save result
-    root_path3='path/to/results/rejection_result'
+    root_path3='./results/experiment1/rejection_result'
     os.makedirs(os.path.join(root_path3, data_name), exist_ok=True)
     rejection_results_df.to_csv(os.path.join(root_path3,data_name,result_file_name3),index=False)
 
@@ -246,6 +272,39 @@ for data_name in data_set:
     fig.tight_layout()
     fig_name = f'Performance Metrics on {data_name} dataset {control_neighbor}_{threshold_rejection}_{filter_proportion}_{predictive_alg}.png'
     # Note: change the path to save result
-    root_path4='path/to/results/plot'
+    root_path4='./results/experiment1/plot'
     os.makedirs(os.path.join(root_path4, data_name), exist_ok=True)
     plt.savefig(os.path.join(root_path4, data_name,fig_name))
+
+
+if len(timings_list) > 0:
+    timings_df = pd.DataFrame(timings_list)
+    # names of timing columns to average
+    timing_cols = ['mars_time', 'srnc_time', 'rejection_time']
+
+    # make sure the timing columns exist (skip missing ones)
+    timing_cols = [c for c in timing_cols if c in timings_df.columns]
+
+    # compute averages (NaN-safe)
+    avg_values = {c: float(timings_df[c].mean()) if c in timing_cols else np.nan for c in timings_df.columns}
+
+    # set non-timing columns explicitly to None (null in CSV)
+    for c in timings_df.columns:
+        if c not in timing_cols:
+            avg_values[c] = None
+
+    # optional: mark a descriptive data_name / row-type
+    if 'data_name' in timings_df.columns:
+        avg_values['data_name'] = 'AVERAGE'
+
+    # append final averaged row
+    timings_df = pd.concat([timings_df, pd.DataFrame([avg_values])], ignore_index=True)
+
+    # write CSV (replace path as needed)
+    out_dir = './results/experiment1/timings'
+    os.makedirs(out_dir, exist_ok=True)
+    csv_path = os.path.join(out_dir, 'timings_info_1.csv')
+    timings_df.to_csv(csv_path, index=False)
+    print(f'Wrote timings (including average row) to: {csv_path}')
+else:
+    print('timings_list is empty; no CSV written.')

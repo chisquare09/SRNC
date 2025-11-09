@@ -7,7 +7,7 @@ from sklearn import svm
 from sklearn.svm import LinearSVC
 import numpy as np
 
-def classification_rejection_v2(X, Y, Y_all_labels, X_train, Y_train,X_test,predictive_alg, threshold_rejection,sss):
+def classification_rejection_v2(X, Y, Y_all_labels, X_train, Y_train,X_test,predictive_alg, threshold_rejection,sss=None):
     if predictive_alg == "svm":
         clf = svm.SVC(probability=True, max_iter=100000).fit(X_train, Y_train)
     if predictive_alg == "LinearSVM":

@@ -74,6 +74,7 @@ def Classifier(Y_all_labels, new_classes, x_test, epsilon_choice, X_train_temp, 
 #%% Algorithm 1
 def SequentialRadiusNeighborsClassifier(X_embedded, Y_all_labels, X_train, X_test, Y_train, predictive_alg,
                                         control_neighbor, shrink_parameter, filter_proportion, threshold_rejection):
+    print("Init SRNC")
     clf = svm.SVC(probability=True, max_iter=10000).fit(X_train, Y_train)
     X_train_temp =  np.copy(X_train)
     Y_train_temp =  np.copy(Y_train)
@@ -85,6 +86,8 @@ def SequentialRadiusNeighborsClassifier(X_embedded, Y_all_labels, X_train, X_tes
     max_distances_test = [np.max(x) for x in max_distances_test]
     sort_indices = np.argsort(max_distances_test)
     epsilon_choice = EpsilonX2X(X_train, Y_train, control_neighbor, filter_proportion)
+
+    print("Done parameter selection")
     for test_time in range(test_size):
         chosen_test = sort_indices[test_time]
         y_predict = Classifier(Y_all_labels, new_classes, X_test[chosen_test],
@@ -99,6 +102,8 @@ def SequentialRadiusNeighborsClassifier(X_embedded, Y_all_labels, X_train, X_tes
         X_train_temp = np.append(X_train_temp, [X_test[chosen_test]], axis =0)
         Y_train_temp = np.append(Y_train_temp, [y_predict], axis =0)
         Y_predict[chosen_test] = y_predict
+
+    print("Done predict")
     return Y_predict
 
 #%% Algorithm 2

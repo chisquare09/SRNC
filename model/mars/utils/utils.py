@@ -6,7 +6,7 @@ Created on Mar 22, 2019
 import torch
 from torch.utils.data import DataLoader
 
-from mars.epoch_sampler.epoch_sampler import EpochSampler
+from ..epoch_sampler.epoch_sampler import EpochSampler
 
 
 def init_labeled_loader(data, val_split = 0.8):
@@ -52,10 +52,10 @@ def init_data_loaders(labeled_data, unlabeled_data, pretrain_data, pretrain_batc
     pretrain_loader = torch.utils.data.DataLoader(dataset=pretrain_data, shuffle=True,
                                                        batch_size=pretrain_batch if pretrain_batch!=None else len(unlabeled_data.x))        
     test_loader = DataLoader(unlabeled_data, 
-                            batch_sampler=EpochSampler(torch.randperm(len(unlabeled_data.x))),
-                            pin_memory=True) 
-    test_loader,_ = init_loader([unlabeled_data], 1.0) # to reproduce results in the paper
-    test_loader = test_loader[0]
+                             batch_sampler=EpochSampler(torch.randperm(len(unlabeled_data.x))),
+                             pin_memory=True) 
+    #test_loader,_ = init_loader([unlabeled_data], 1.0) # to reproduce results in the paper
+    #test_loader = test_loader[0]
     return train_loader, test_loader, pretrain_loader, val_loader
            
            
